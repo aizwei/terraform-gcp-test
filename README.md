@@ -9,7 +9,6 @@ to deploy it on **Google Cloud Run** using **Terraform**.
 
 - Add Terraform to provision the infrastructure on GCP.
 - Deploy the containerized API to Cloud Run.
-- Handle authentication via the provided `service_account.json`.
 - Fix and explain encountered issues (permissions, backend setup, etc.).
 
 ---

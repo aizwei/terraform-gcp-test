@@ -1,0 +1,42 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+    - name: Configure Docker to use gcloud as a credential helper
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build image
+      run: |
+        IMAGE="eu.gcr.io/${{ secrets.GCP_PROJECT_ID }}/dummy-api:${GITHUB_SHA}"
+        docker build -t $IMAGE ./api
+        docker push $IMAGE
+      env:
+        CLOUDSDK_CORE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+
+    - name: Terraform - init & apply
+      working-directory: infra/main
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcloud-key.json
+        TF_VAR_project: ${{ secrets.GCP_PROJECT_ID }}
+        TF_VAR_region: "europe-southwest1"
+        TF_VAR_image: "eu.gcr.io/${{ secrets.GCP_PROJECT_ID }}/dummy-api:${GITHUB_SHA}"
+      run: |
+        echo "${{ secrets.GCP_SA_KEY }}" > /tmp/gcloud-key.json
+        terraform init -input=false
+        terraform plan -input=false -out=tfplan -var="image=eu.gcr.io/${{ secrets.GCP_PROJECT_ID }}/dummy-api:${GITHUB_SHA}"
+        terraform apply -input=false -auto-approve tfplan
